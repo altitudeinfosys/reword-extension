@@ -1,7 +1,7 @@
 import { callProvider } from './providers.js';
 import { PROMPTS } from './prompts.js';
 
-const MODES = ['polish', 'formalize', 'shortify', 'elaborate'];
+const MODES = ['polish', 'formalize', 'shortify', 'elaborate', 'warm'];
 
 // Create context menus on install/update
 function setupContextMenus() {

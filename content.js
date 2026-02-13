@@ -86,7 +86,8 @@ const MODES = [
   { id: 'polish', label: 'Polish', icon: '✨' },
   { id: 'formalize', label: 'Formal', icon: '👔' },
   { id: 'shortify', label: 'Short', icon: '✂️' },
-  { id: 'elaborate', label: 'More', icon: '📝' }
+  { id: 'elaborate', label: 'More', icon: '📝' },
+  { id: 'warm', label: 'Warm', icon: '🤗' }
 ];
 
 const STATE_CLASSES = ['reword-state-buttons', 'reword-state-loading', 'reword-state-error'];
