@@ -28,7 +28,7 @@
     "trigger-default-rewrite": {
       "suggested_key": {
         "default": "Alt+R",
-        "mac": "Alt+R"
+        "mac": "MacCtrl+Shift+R"
       },
       "description": "Rewrite selected text with default mode"
     }
