@@ -13,10 +13,13 @@ zip -r "$OUT" . \
   -x "test.html" \
   -x "build.sh" \
   -x "PLAN.md" \
+  -x "ROADMAP.md" \
   -x "STORE_LISTING.md" \
   -x "privacy-policy.html" \
   -x "*.zip" \
-  -x ".gitignore"
+  -x ".gitignore" \
+  -x "README.md" \
+  -x ".claude/*"
 
 SIZE=$(du -h "$OUT" | cut -f1)
 echo ""

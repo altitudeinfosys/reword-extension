@@ -44,7 +44,7 @@ export async function fetchOpenRouterModels() {
     .map(m => ({ id: m.id, name: m.name }));
 }
 
-export async function callProvider(providerName, apiKey, model, systemPrompt, userText) {
+export async function callProvider(providerName, apiKey, model, systemPrompt, userText, { signal } = {}) {
   const provider = PROVIDERS[providerName];
   if (!provider) throw new Error(`Unknown provider: ${providerName}`);
 
@@ -53,8 +53,9 @@ export async function callProvider(providerName, apiKey, model, systemPrompt, us
 
   let result;
   try {
-    result = await provider(apiKey, effectiveModel, systemPrompt, userText);
+    result = await provider(apiKey, effectiveModel, systemPrompt, userText, signal);
   } catch (err) {
+    if (err.name === 'AbortError') throw err;
     if (err instanceof ProviderError) throw err;
     if (err instanceof TypeError) throw new Error('Network error. Check your internet connection.');
     throw err;
@@ -70,9 +71,10 @@ export async function testConnection(providerName, apiKey, model) {
 }
 
 const PROVIDERS = {
-  async openai(apiKey, model, systemPrompt, userText) {
+  async openai(apiKey, model, systemPrompt, userText, signal) {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
+      signal,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
@@ -96,9 +98,10 @@ const PROVIDERS = {
     return data.choices?.[0]?.message?.content?.trim() || '';
   },
 
-  async anthropic(apiKey, model, systemPrompt, userText) {
+  async anthropic(apiKey, model, systemPrompt, userText, signal) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
@@ -124,10 +127,11 @@ const PROVIDERS = {
     return data.content?.[0]?.text?.trim() || '';
   },
 
-  async gemini(apiKey, model, systemPrompt, userText) {
+  async gemini(apiKey, model, systemPrompt, userText, signal) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const res = await fetch(url, {
       method: 'POST',
+      signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
@@ -145,9 +149,10 @@ const PROVIDERS = {
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
   },
 
-  async openrouter(apiKey, model, systemPrompt, userText) {
+  async openrouter(apiKey, model, systemPrompt, userText, signal) {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
+      signal,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,

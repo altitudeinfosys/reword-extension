@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Reword</title>
+  <link rel="stylesheet" href="onboarding.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Step 1: Welcome -->
+    <div class="step" id="step1">
+      <div class="icon-large">&#x270D;&#xFE0F;</div>
+      <h1>Welcome to Reword</h1>
+      <p class="subtitle">Rewrite any text with AI, right where you type.</p>
+      <div class="features">
+        <div class="feature">
+          <span class="feature-icon">&#x2728;</span>
+          <span>Polish grammar &amp; flow</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">&#x1F454;</span>
+          <span>Formalize for business</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">&#x2702;&#xFE0F;</span>
+          <span>Shorten &amp; condense</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">&#x1F4DD;</span>
+          <span>Elaborate with detail</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">&#x1F917;</span>
+          <span>Warm &amp; friendly tone</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">&#x1F310;</span>
+          <span>Translate to 15 languages</span>
+        </div>
+      </div>
+      <button class="btn primary" id="startBtn">Get Started</button>
+    </div>
+
+    <!-- Step 2: Configuration -->
+    <div class="step hidden" id="step2">
+      <h1>Set Up Your AI Provider</h1>
+      <p class="subtitle">Reword uses your own API key. Your text goes directly to the provider — no middleman.</p>
+
+      <div class="field">
+        <label for="ob-provider">AI Provider</label>
+        <select id="ob-provider">
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="gemini">Gemini</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="ob-apiKey">API Key</label>
+        <input type="password" id="ob-apiKey" placeholder="Paste your API key here" autocomplete="off">
+        <span class="hint" id="ob-keyHint">Stored locally. Never sent to our servers.</span>
+      </div>
+
+      <div class="field">
+        <label for="ob-model">Model</label>
+        <select id="ob-model">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+
+      <div class="actions">
+        <button class="btn secondary" id="backBtn">Back</button>
+        <button class="btn primary" id="testSaveBtn">Test &amp; Save</button>
+      </div>
+
+      <div id="ob-status" class="status" hidden></div>
+    </div>
+
+    <!-- Step 3: Done -->
+    <div class="step hidden" id="step3">
+      <div class="icon-large">&#x1F389;</div>
+      <h1>You're All Set!</h1>
+      <p class="subtitle">Here's how to use Reword:</p>
+      <div class="instructions">
+        <div class="instruction">
+          <span class="instruction-num">1</span>
+          <span>Select text in any editable field</span>
+        </div>
+        <div class="instruction">
+          <span class="instruction-num">2</span>
+          <span>Pick a mode from the floating toolbar</span>
+        </div>
+        <div class="instruction">
+          <span class="instruction-num">3</span>
+          <span>Your text is rewritten in place</span>
+        </div>
+      </div>
+      <div class="shortcuts-info">
+        <p><strong>Tip:</strong> Use <kbd>Alt+R</kbd> to rewrite with your default mode, or press <kbd>1</kbd>-<kbd>5</kbd> when the toolbar appears.</p>
+      </div>
+      <button class="btn primary" id="doneBtn">Start Writing</button>
+    </div>
+
+    <!-- Progress dots -->
+    <div class="progress">
+      <div class="dot active" data-step="1"></div>
+      <div class="dot" data-step="2"></div>
+      <div class="dot" data-step="3"></div>
+    </div>
+  </div>
+
+  <script type="module" src="onboarding.js"></script>
+</body>
+</html>

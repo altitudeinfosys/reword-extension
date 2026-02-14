@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Reword",
-  "version": "1.0.0",
-  "description": "Select text in editable fields and rewrite it with AI. Supports OpenAI, Anthropic, Gemini, and OpenRouter.",
+  "name": "Reword \u2014 AI Text Rewriter",
+  "version": "1.1.0",
+  "description": "Rewrite, polish, translate, and shorten text with AI. BYO API key. Supports OpenAI, Anthropic, Gemini, and OpenRouter.",
   "permissions": [
     "contextMenus",
     "activeTab",
@@ -23,6 +23,15 @@
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
+  },
+  "commands": {
+    "trigger-default-rewrite": {
+      "suggested_key": {
+        "default": "Alt+R",
+        "mac": "Alt+R"
+      },
+      "description": "Rewrite selected text with default mode"
+    }
   },
   "icons": {
     "16": "icons/icon16.png",

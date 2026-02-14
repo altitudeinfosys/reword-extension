@@ -83,24 +83,54 @@ function replaceSelectedText(selectionData, newText) {
 // This makes mixed states structurally impossible.
 
 const MODES = [
-  { id: 'polish', label: 'Polish', icon: '✨' },
-  { id: 'formalize', label: 'Formal', icon: '👔' },
-  { id: 'shortify', label: 'Short', icon: '✂️' },
-  { id: 'elaborate', label: 'More', icon: '📝' },
-  { id: 'warm', label: 'Warm', icon: '🤗' }
+  { id: 'polish', label: 'Polish', icon: '✨', key: '1' },
+  { id: 'formalize', label: 'Formal', icon: '👔', key: '2' },
+  { id: 'shortify', label: 'Short', icon: '✂️', key: '3' },
+  { id: 'elaborate', label: 'More', icon: '📝', key: '4' },
+  { id: 'warm', label: 'Warm', icon: '🤗', key: '5' }
+];
+
+const TRANSLATE_LANGUAGES = [
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'pl', name: 'Polish' },
+  { code: 'sv', name: 'Swedish' }
 ];
 
 const STATE_CLASSES = ['reword-state-buttons', 'reword-state-loading', 'reword-state-error'];
 
 let toolbar = null;
 let toolbarError = null;
+let translateMenu = null;
+let enabledTranslateLangs = null;
 let currentSelection = null;
 let toolbarState = 'hidden';
 let selectionCheckTimer = null;
 let suppressUntil = 0;
+let undoData = null;
+let undoPill = null;
+let undoTimer = null;
+let lastFailedRequest = null;
 
 function createToolbar() {
   if (toolbar) return;
+
+  // Load enabled translate languages from storage
+  chrome.storage.sync.get(['translateLangs'], (data) => {
+    enabledTranslateLangs = data.translateLangs || null;
+    if (translateMenu) refreshTranslateMenu();
+  });
 
   toolbar = document.createElement('div');
   toolbar.id = 'reword-toolbar';
@@ -112,12 +142,35 @@ function createToolbar() {
     const btn = document.createElement('button');
     btn.className = 'reword-btn';
     btn.dataset.mode = mode.id;
-    btn.title = mode.label;
+    btn.title = `${mode.label} (${mode.key})`;
     btn.textContent = `${mode.icon} ${mode.label}`;
     btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handleToolbarClick(mode.id); });
     buttonsDiv.appendChild(btn);
   }
+
+  // Translate button with sub-menu
+  const translateWrapper = document.createElement('div');
+  translateWrapper.className = 'reword-translate-wrapper';
+
+  const translateBtn = document.createElement('button');
+  translateBtn.className = 'reword-btn reword-translate-btn';
+  translateBtn.title = 'Translate';
+  translateBtn.textContent = '\u{1F310} Translate';
+  translateBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  translateBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleTranslateMenu();
+  });
+
+  translateMenu = document.createElement('div');
+  translateMenu.id = 'reword-translate-menu';
+  buildTranslateMenuItems();
+
+  translateWrapper.appendChild(translateBtn);
+  translateWrapper.appendChild(translateMenu);
+  buttonsDiv.appendChild(translateWrapper);
 
   // Loading
   const loadingDiv = document.createElement('div');
@@ -133,15 +186,61 @@ function createToolbar() {
   toolbarError = document.createElement('div');
   toolbarError.id = 'reword-error';
 
+  const errorMsg = document.createElement('span');
+  errorMsg.id = 'reword-error-msg';
+  toolbarError.appendChild(errorMsg);
+
+  const errorActions = document.createElement('div');
+  errorActions.id = 'reword-error-actions';
+  toolbarError.appendChild(errorActions);
+
   toolbar.appendChild(buttonsDiv);
   toolbar.appendChild(loadingDiv);
   toolbar.appendChild(toolbarError);
   document.body.appendChild(toolbar);
 }
 
+function buildTranslateMenuItems() {
+  if (!translateMenu) return;
+  while (translateMenu.firstChild) translateMenu.removeChild(translateMenu.firstChild);
+
+  const langs = enabledTranslateLangs
+    ? TRANSLATE_LANGUAGES.filter(l => enabledTranslateLangs.includes(l.code))
+    : TRANSLATE_LANGUAGES;
+
+  for (const lang of langs) {
+    const langBtn = document.createElement('button');
+    langBtn.className = 'reword-lang-btn';
+    langBtn.textContent = lang.name;
+    langBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    langBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideTranslateMenu();
+      handleToolbarClick(`translate-${lang.code}`);
+    });
+    translateMenu.appendChild(langBtn);
+  }
+}
+
+function refreshTranslateMenu() {
+  buildTranslateMenuItems();
+}
+
+function toggleTranslateMenu() {
+  if (!translateMenu) return;
+  translateMenu.classList.toggle('reword-translate-menu-visible');
+}
+
+function hideTranslateMenu() {
+  if (!translateMenu) return;
+  translateMenu.classList.remove('reword-translate-menu-visible');
+}
+
 function setToolbarState(newState, opts) {
   createToolbar();
   toolbarState = newState;
+  hideTranslateMenu();
 
   // Remove all state classes — this is the key: only ONE class controls visibility
   toolbar.classList.remove(...STATE_CLASSES);
@@ -166,17 +265,142 @@ function setToolbarState(newState, opts) {
     toolbar.classList.add('reword-state-loading');
   } else if (newState === 'error') {
     toolbar.classList.add('reword-state-error');
-    toolbarError.textContent = (opts && opts.message) || 'Something went wrong.';
-    setTimeout(() => {
-      if (toolbarState === 'error') setToolbarState('hidden');
-    }, 4000);
+    const msg = (opts && opts.message) || 'Something went wrong.';
+    const errorMsg = toolbarError.querySelector('#reword-error-msg');
+    const errorActions = toolbarError.querySelector('#reword-error-actions');
+    errorMsg.textContent = msg;
+
+    // Clear previous action buttons
+    while (errorActions.firstChild) errorActions.removeChild(errorActions.firstChild);
+
+    const isApiKeyError = msg.toLowerCase().includes('api key') || msg.toLowerCase().includes('settings');
+    const isTransientError = msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('network') || msg.toLowerCase().includes('server error') || msg.toLowerCase().includes('try again');
+
+    if (isApiKeyError) {
+      const settingsBtn = document.createElement('button');
+      settingsBtn.className = 'reword-error-btn';
+      settingsBtn.textContent = 'Open Settings';
+      settingsBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+      settingsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
+        setToolbarState('hidden');
+      });
+      errorActions.appendChild(settingsBtn);
+    }
+
+    if (isTransientError && lastFailedRequest) {
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'reword-error-btn';
+      retryBtn.textContent = 'Retry';
+      retryBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+      retryBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const req = lastFailedRequest;
+        lastFailedRequest = null;
+        handleToolbarClick(req.mode);
+      });
+      errorActions.appendChild(retryBtn);
+    }
+
+    // Always add dismiss button
+    const dismissBtn = document.createElement('button');
+    dismissBtn.className = 'reword-error-btn reword-error-dismiss';
+    dismissBtn.textContent = '\u2715';
+    dismissBtn.title = 'Dismiss';
+    dismissBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    dismissBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setToolbarState('hidden');
+    });
+    errorActions.appendChild(dismissBtn);
   }
+}
+
+// ─── Undo feature ───────────────────────────────────────────────────
+
+function showUndoPill(originalText, selectionData, newText) {
+  hideUndoPill();
+
+  undoData = { originalText, selectionData, newText };
+
+  undoPill = document.createElement('div');
+  undoPill.id = 'reword-undo-pill';
+  undoPill.textContent = '\u21A9 Undo';
+  undoPill.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  undoPill.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    performUndo();
+  });
+
+  // Position near the toolbar's last location
+  if (toolbar) {
+    undoPill.style.left = toolbar.style.left;
+    undoPill.style.top = toolbar.style.top;
+  }
+
+  document.body.appendChild(undoPill);
+
+  undoTimer = setTimeout(hideUndoPill, 6000);
+}
+
+function hideUndoPill() {
+  clearTimeout(undoTimer);
+  if (undoPill && undoPill.parentNode) {
+    undoPill.parentNode.removeChild(undoPill);
+  }
+  undoPill = null;
+  undoData = null;
+}
+
+function performUndo() {
+  if (!undoData) return;
+
+  const { originalText, selectionData, newText } = undoData;
+
+  if (selectionData.type === 'native') {
+    const el = selectionData.element;
+    // Find where the new text was inserted and replace it back
+    const insertStart = selectionData.start;
+    const insertEnd = insertStart + newText.length;
+    el.value = el.value.substring(0, insertStart) + originalText + el.value.substring(insertEnd);
+    el.setSelectionRange(insertStart, insertStart + originalText.length);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  } else if (selectionData.type === 'contenteditable') {
+    // For contenteditable, use document.execCommand as a simple approach
+    selectionData.element.focus();
+    // Try to find the new text node and replace it
+    const walker = document.createTreeWalker(selectionData.element, NodeFilter.SHOW_TEXT);
+    let node;
+    while (node = walker.nextNode()) {
+      const idx = node.textContent.indexOf(newText);
+      if (idx !== -1) {
+        const range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, idx + newText.length);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(originalText));
+        selectionData.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+        break;
+      }
+    }
+  }
+
+  hideUndoPill();
 }
 
 // ─── Toolbar click → background API call ────────────────────────────
 
 async function handleToolbarClick(mode) {
-  if (toolbarState !== 'buttons' || !currentSelection) return;
+  if ((toolbarState !== 'buttons' && toolbarState !== 'error') || !currentSelection) return;
 
   clearTimeout(selectionCheckTimer);
   const savedSelection = currentSelection;
@@ -190,19 +414,26 @@ async function handleToolbarClick(mode) {
       text: savedSelection.text
     });
 
+    if (response.aborted) return;
+
     if (response.error) {
+      lastFailedRequest = { mode };
+      currentSelection = savedSelection;
       setToolbarState('error', { message: response.error });
-      currentSelection = null;
       return;
     }
 
+    lastFailedRequest = null;
+    const originalText = savedSelection.text;
     replaceSelectedText(savedSelection, response.text);
+    showUndoPill(originalText, savedSelection, response.text);
     currentSelection = null;
     setToolbarState('hidden');
     suppressUntil = Date.now() + 500;
   } catch (err) {
+    lastFailedRequest = { mode };
+    currentSelection = savedSelection;
     setToolbarState('error', { message: err.message || 'Connection to extension lost.' });
-    currentSelection = null;
   }
 }
 
@@ -270,6 +501,31 @@ document.addEventListener('mousedown', (e) => {
   }
 });
 
+// Keyboard shortcuts: 1-5 to select mode, Escape to dismiss, Ctrl/Cmd+Z to undo
+document.addEventListener('keydown', (e) => {
+  // Undo: Ctrl+Z / Cmd+Z when undo pill is visible
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey) && undoData) {
+    e.preventDefault();
+    performUndo();
+    return;
+  }
+
+  if (toolbarState !== 'buttons') return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    setToolbarState('hidden');
+    currentSelection = null;
+    return;
+  }
+
+  const mode = MODES.find(m => m.key === e.key);
+  if (mode && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    handleToolbarClick(mode.id);
+  }
+});
+
 // ─── Message listener (for context menu flow) ───────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -298,7 +554,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'REPLACE_TEXT') {
     if (currentSelection) {
+      const originalText = currentSelection.text;
       replaceSelectedText(currentSelection, message.text);
+      showUndoPill(originalText, currentSelection, message.text);
       currentSelection = null;
     }
     setToolbarState('hidden');

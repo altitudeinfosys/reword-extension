@@ -1,15 +1,58 @@
 import { getDefaultModel, getModelsForProvider, fetchOpenRouterModels, testConnection } from './providers.js';
 
+const ALL_LANGUAGES = [
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'pl', name: 'Polish' },
+  { code: 'sv', name: 'Swedish' }
+];
+
 const providerEl = document.getElementById('provider');
 const apiKeyEl = document.getElementById('apiKey');
 const modelEl = document.getElementById('model');
 const modelHintEl = document.getElementById('modelHint');
 const defaultModeEl = document.getElementById('defaultMode');
+const translateLangsEl = document.getElementById('translateLangs');
 const saveBtn = document.getElementById('saveBtn');
 const testBtn = document.getElementById('testBtn');
 const statusEl = document.getElementById('status');
 
 let openRouterModelsCache = null;
+
+// Populate translate language checkboxes
+function populateLanguages(enabledCodes) {
+  while (translateLangsEl.firstChild) translateLangsEl.removeChild(translateLangsEl.firstChild);
+  // If no saved preference, enable all by default
+  const enabled = enabledCodes || ALL_LANGUAGES.map(l => l.code);
+
+  for (const lang of ALL_LANGUAGES) {
+    const label = document.createElement('label');
+    label.className = 'checkbox-label';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = lang.code;
+    checkbox.checked = enabled.includes(lang.code);
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(` ${lang.name}`));
+    translateLangsEl.appendChild(label);
+  }
+}
+
+function getSelectedLanguages() {
+  const checkboxes = translateLangsEl.querySelectorAll('input[type="checkbox"]:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
 
 // Populate model dropdown when provider changes
 async function populateModels(provider, selectedModel) {
@@ -68,11 +111,12 @@ providerEl.addEventListener('change', () => {
 });
 
 // Load saved settings
-chrome.storage.sync.get(['provider', 'apiKey', 'model', 'defaultMode'], (data) => {
+chrome.storage.sync.get(['provider', 'apiKey', 'model', 'defaultMode', 'translateLangs'], (data) => {
   if (data.provider) providerEl.value = data.provider;
   if (data.apiKey) apiKeyEl.value = data.apiKey;
   if (data.defaultMode) defaultModeEl.value = data.defaultMode;
   populateModels(data.provider || 'openai', data.model || null);
+  populateLanguages(data.translateLangs || null);
 });
 
 // Save
@@ -81,7 +125,8 @@ saveBtn.addEventListener('click', () => {
     provider: providerEl.value,
     apiKey: apiKeyEl.value.trim(),
     model: modelEl.value,
-    defaultMode: defaultModeEl.value
+    defaultMode: defaultModeEl.value,
+    translateLangs: getSelectedLanguages()
   };
 
   if (!settings.apiKey) {

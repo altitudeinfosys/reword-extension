@@ -32,10 +32,12 @@
 /* Only show the matching child for each state */
 #reword-toolbar.reword-state-buttons #reword-buttons { display: flex; }
 #reword-toolbar.reword-state-loading #reword-loading { display: flex; }
-#reword-toolbar.reword-state-error #reword-error { display: block; }
+#reword-toolbar.reword-state-error #reword-error { display: flex; }
 
 /* Button styles */
 #reword-buttons {
+  display: flex;
+  align-items: center;
   gap: 2px;
 }
 
@@ -85,12 +87,146 @@
   to { transform: rotate(360deg); }
 }
 
+/* Translate button & sub-menu */
+.reword-translate-wrapper {
+  position: relative;
+}
+
+.reword-translate-btn {
+  border-left: 1px solid #2a2a4a !important;
+  margin-left: 2px;
+}
+
+#reword-translate-menu {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  flex-direction: column;
+  gap: 1px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 2147483647;
+  white-space: nowrap;
+}
+
+#reword-translate-menu.reword-translate-menu-visible {
+  display: flex;
+}
+
+.reword-lang-btn {
+  all: unset;
+  display: block;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #c0c0d8;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.reword-lang-btn:hover {
+  background: #2a2a4a;
+  color: #ffffff;
+}
+
+/* Scrollbar styling for translate menu */
+#reword-translate-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+#reword-translate-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#reword-translate-menu::-webkit-scrollbar-thumb {
+  background: #3a3a5a;
+  border-radius: 2px;
+}
+
+/* Undo pill */
+#reword-undo-pill {
+  position: absolute;
+  z-index: 2147483647;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: #c0c0d8;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  animation: reword-fade-in 0.2s ease;
+}
+
+#reword-undo-pill:hover {
+  background: #2a2a4a;
+  color: #ffffff;
+}
+
+@keyframes reword-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Error state */
 #reword-error {
   padding: 6px 12px;
   color: #f87171;
   font-size: 12px;
-  max-width: 300px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#reword-error-msg {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+#reword-error-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.reword-error-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #c0c0d8;
+  background: #2a2a4a;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  white-space: nowrap;
+}
+
+.reword-error-btn:hover {
+  background: #3a3a5a;
+  color: #ffffff;
+}
+
+.reword-error-dismiss {
+  margin-left: auto;
+  padding: 3px 6px;
+  font-size: 13px;
 }
