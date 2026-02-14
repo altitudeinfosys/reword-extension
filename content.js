@@ -74,18 +74,16 @@ function replaceSelectedText(selectionData, newText) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   } else if (selectionData.type === 'contenteditable') {
+    // Restore selection to the saved range
     const range = selectionData.range;
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    range.deleteContents();
-    const textNode = document.createTextNode(newText);
-    range.insertNode(textNode);
-    range.setStartAfter(textNode);
-    range.setEndAfter(textNode);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    selectionData.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+
+    // Use execCommand to replace text — this preserves surrounding formatting
+    // (bold, italic, links, etc.) because the browser inherits the style context
+    selectionData.element.focus();
+    document.execCommand('insertText', false, newText);
   }
 }
 
