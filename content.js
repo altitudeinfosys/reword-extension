@@ -1,3 +1,20 @@
+// ─── Extension context check ────────────────────────────────────────
+
+function isExtensionValid() {
+  try {
+    return !!chrome.runtime?.id;
+  } catch {
+    return false;
+  }
+}
+
+function safeSendMessage(msg) {
+  if (!isExtensionValid()) {
+    return Promise.reject(new Error('Extension updated. Refresh the page to continue using Reword.'));
+  }
+  return chrome.runtime.sendMessage(msg);
+}
+
 // ─── Editable field detection ───────────────────────────────────────
 
 function isEditableElement(el) {
@@ -91,21 +108,21 @@ const MODES = [
 ];
 
 const TRANSLATE_LANGUAGES = [
-  { code: 'es', name: 'Spanish' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'nl', name: 'Dutch' },
   { code: 'fr', name: 'French' },
   { code: 'de', name: 'German' },
+  { code: 'hi', name: 'Hindi' },
   { code: 'it', name: 'Italian' },
-  { code: 'pt', name: 'Portuguese' },
-  { code: 'nl', name: 'Dutch' },
-  { code: 'ru', name: 'Russian' },
-  { code: 'zh', name: 'Chinese' },
   { code: 'ja', name: 'Japanese' },
   { code: 'ko', name: 'Korean' },
-  { code: 'ar', name: 'Arabic' },
-  { code: 'hi', name: 'Hindi' },
-  { code: 'tr', name: 'Turkish' },
   { code: 'pl', name: 'Polish' },
-  { code: 'sv', name: 'Swedish' }
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'sv', name: 'Swedish' },
+  { code: 'tr', name: 'Turkish' }
 ];
 
 const STATE_CLASSES = ['reword-state-buttons', 'reword-state-loading', 'reword-state-error'];
@@ -122,6 +139,7 @@ let undoData = null;
 let undoPill = null;
 let undoTimer = null;
 let lastFailedRequest = null;
+let pendingUndoSnapshot = null;
 
 function createToolbar() {
   if (toolbar) return;
@@ -284,7 +302,7 @@ function setToolbarState(newState, opts) {
       settingsBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
+        safeSendMessage({ type: 'OPEN_OPTIONS' });
         setToolbarState('hidden');
       });
       errorActions.appendChild(settingsBtn);
@@ -322,10 +340,18 @@ function setToolbarState(newState, opts) {
 
 // ─── Undo feature ───────────────────────────────────────────────────
 
-function showUndoPill(originalText, selectionData, newText) {
+function saveUndoSnapshot(selectionData) {
+  if (selectionData.type === 'native') {
+    return { type: 'native', element: selectionData.element, value: selectionData.element.value };
+  } else {
+    return { type: 'contenteditable', element: selectionData.element, html: selectionData.element.innerHTML };
+  }
+}
+
+function showUndoPill(snapshot) {
   hideUndoPill();
 
-  undoData = { originalText, selectionData, newText };
+  undoData = snapshot;
 
   undoPill = document.createElement('div');
   undoPill.id = 'reword-undo-pill';
@@ -360,38 +386,14 @@ function hideUndoPill() {
 function performUndo() {
   if (!undoData) return;
 
-  const { originalText, selectionData, newText } = undoData;
-
-  if (selectionData.type === 'native') {
-    const el = selectionData.element;
-    // Find where the new text was inserted and replace it back
-    const insertStart = selectionData.start;
-    const insertEnd = insertStart + newText.length;
-    el.value = el.value.substring(0, insertStart) + originalText + el.value.substring(insertEnd);
-    el.setSelectionRange(insertStart, insertStart + originalText.length);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  } else if (selectionData.type === 'contenteditable') {
-    // For contenteditable, use document.execCommand as a simple approach
-    selectionData.element.focus();
-    // Try to find the new text node and replace it
-    const walker = document.createTreeWalker(selectionData.element, NodeFilter.SHOW_TEXT);
-    let node;
-    while (node = walker.nextNode()) {
-      const idx = node.textContent.indexOf(newText);
-      if (idx !== -1) {
-        const range = document.createRange();
-        range.setStart(node, idx);
-        range.setEnd(node, idx + newText.length);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        range.deleteContents();
-        range.insertNode(document.createTextNode(originalText));
-        selectionData.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
-        break;
-      }
-    }
+  if (undoData.type === 'native') {
+    undoData.element.value = undoData.value;
+    undoData.element.dispatchEvent(new Event('input', { bubbles: true }));
+    undoData.element.dispatchEvent(new Event('change', { bubbles: true }));
+  } else if (undoData.type === 'contenteditable') {
+    // Safe: restoring the element's own captured innerHTML from moments ago
+    undoData.element.innerHTML = undoData.html; // eslint-disable-line no-unsanitized/property
+    undoData.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
   }
 
   hideUndoPill();
@@ -404,11 +406,12 @@ async function handleToolbarClick(mode) {
 
   clearTimeout(selectionCheckTimer);
   const savedSelection = currentSelection;
+  const snapshot = saveUndoSnapshot(savedSelection);
 
   setToolbarState('loading');
 
   try {
-    const response = await chrome.runtime.sendMessage({
+    const response = await safeSendMessage({
       type: 'REWORD_REQUEST',
       mode,
       text: savedSelection.text
@@ -424,9 +427,8 @@ async function handleToolbarClick(mode) {
     }
 
     lastFailedRequest = null;
-    const originalText = savedSelection.text;
     replaceSelectedText(savedSelection, response.text);
-    showUndoPill(originalText, savedSelection, response.text);
+    showUndoPill(snapshot);
     currentSelection = null;
     setToolbarState('hidden');
     suppressUntil = Date.now() + 500;
@@ -547,6 +549,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         toolbar.style.top = `${pos.y}px`;
       }
     }
+    // Capture snapshot now, before the API call modifies anything
+    if (currentSelection) pendingUndoSnapshot = saveUndoSnapshot(currentSelection);
     setToolbarState('loading');
     sendResponse();
     return;
@@ -554,9 +558,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'REPLACE_TEXT') {
     if (currentSelection) {
-      const originalText = currentSelection.text;
+      // Snapshot was already saved in SHOW_LOADING; fall back if missing
+      if (!pendingUndoSnapshot) pendingUndoSnapshot = saveUndoSnapshot(currentSelection);
       replaceSelectedText(currentSelection, message.text);
-      showUndoPill(originalText, currentSelection, message.text);
+      showUndoPill(pendingUndoSnapshot);
+      pendingUndoSnapshot = null;
       currentSelection = null;
     }
     setToolbarState('hidden');
