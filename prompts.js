@@ -98,6 +98,22 @@ Constraints:
 - Return ONLY the translated text, nothing else. No quotes, no labels.`;
 }
 
+export function buildContextHint(context) {
+  if (!context || Object.keys(context).length === 0) return '';
+
+  const parts = [];
+  if (context.domain) parts.push(`Website: ${context.domain}`);
+  if (context.pageTitle) parts.push(`Page: ${context.pageTitle}`);
+  if (context.fieldLabel) parts.push(`Field: ${context.fieldLabel}`);
+  else if (context.placeholder) parts.push(`Field placeholder: ${context.placeholder}`);
+  else if (context.ariaLabel) parts.push(`Field: ${context.ariaLabel}`);
+  if (context.nearbyHeading) parts.push(`Section: ${context.nearbyHeading}`);
+
+  if (parts.length === 0) return '';
+
+  return `\n\n[User is typing on: ${parts.join(' | ')}]`;
+}
+
 export const LANGUAGES = [
   { code: 'ar', name: 'Arabic' },
   { code: 'zh', name: 'Chinese' },

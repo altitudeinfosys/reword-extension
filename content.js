@@ -63,6 +63,37 @@ function getSelectedText() {
   return null;
 }
 
+function captureContext(element) {
+  const ctx = {};
+  ctx.domain = window.location.hostname;
+  ctx.pageTitle = document.title.slice(0, 100);
+
+  if (element) {
+    ctx.fieldTag = element.tagName?.toLowerCase();
+    ctx.fieldType = element.type || null;
+    ctx.fieldName = element.name || element.id || null;
+    ctx.placeholder = element.placeholder || null;
+    ctx.ariaLabel = element.getAttribute('aria-label') || null;
+
+    const id = element.id;
+    if (id) {
+      const label = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+      if (label) ctx.fieldLabel = label.textContent.trim().slice(0, 100);
+    }
+    if (!ctx.fieldLabel && element.closest('label')) {
+      ctx.fieldLabel = element.closest('label').textContent.trim().slice(0, 100);
+    }
+
+    const section = element.closest('section, article, form, [role="dialog"], [role="main"]');
+    if (section) {
+      const heading = section.querySelector('h1, h2, h3, h4, h5, h6');
+      if (heading) ctx.nearbyHeading = heading.textContent.trim().slice(0, 100);
+    }
+  }
+
+  return Object.fromEntries(Object.entries(ctx).filter(([_, v]) => v));
+}
+
 function replaceSelectedText(selectionData, newText) {
   if (!selectionData) return;
 
@@ -369,7 +400,7 @@ function showUndoPill(snapshot) {
 
   document.body.appendChild(undoPill);
 
-  undoTimer = setTimeout(hideUndoPill, 6000);
+  undoTimer = setTimeout(hideUndoPill, 15000);
 }
 
 function hideUndoPill() {
@@ -412,7 +443,8 @@ async function handleToolbarClick(mode) {
     const response = await safeSendMessage({
       type: 'REWORD_REQUEST',
       mode,
-      text: savedSelection.text
+      text: savedSelection.text,
+      context: captureContext(savedSelection.element)
     });
 
     if (response.aborted) return;
@@ -532,7 +564,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'GET_SELECTION') {
     const sel = getSelectedText();
     currentSelection = sel;
-    sendResponse({ text: sel ? sel.text : null });
+    sendResponse({ text: sel ? sel.text : null, context: sel ? captureContext(sel.element) : null });
     return;
   }
 

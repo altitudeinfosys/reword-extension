@@ -1,5 +1,5 @@
 import { callProvider } from './providers.js';
-import { PROMPTS, getTranslatePrompt, LANGUAGES } from './prompts.js';
+import { PROMPTS, getTranslatePrompt, LANGUAGES, buildContextHint } from './prompts.js';
 
 const MODES = ['polish', 'formalize', 'shortify', 'elaborate', 'warm'];
 const TRANSLATE_PREFIX = 'reword-translate-';
@@ -94,7 +94,9 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
 
     const signal = createAbortSignal();
-    const systemPrompt = PROMPTS[mode];
+    let systemPrompt = PROMPTS[mode];
+    const contextHint = buildContextHint(response.context);
+    if (contextHint) systemPrompt += contextHint;
     const result = await callProvider(settings.provider || 'openai', settings.apiKey, settings.model, systemPrompt, response.text, { signal });
     chrome.tabs.sendMessage(tab.id, { type: 'REPLACE_TEXT', text: result });
   } catch (err) {
@@ -136,6 +138,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       return;
     }
 
+    const contextHint = buildContextHint(response.context);
+    if (contextHint) systemPrompt += contextHint;
+
     const signal = createAbortSignal();
     const result = await callProvider(settings.provider || 'openai', settings.apiKey, settings.model, systemPrompt, response.text, { signal });
     chrome.tabs.sendMessage(tab.id, { type: 'REPLACE_TEXT', text: result });
@@ -165,7 +170,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function handleRewordRequest({ mode, text }) {
+async function handleRewordRequest({ mode, text, context }) {
   const signal = createAbortSignal();
   const settings = await chrome.storage.sync.get(['provider', 'apiKey', 'model']);
 
@@ -182,6 +187,9 @@ async function handleRewordRequest({ mode, text }) {
   } else {
     systemPrompt = PROMPTS[mode];
   }
+
+  const contextHint = buildContextHint(context);
+  if (contextHint) systemPrompt += contextHint;
 
   const result = await callProvider(settings.provider || 'openai', settings.apiKey, settings.model, systemPrompt, text, { signal });
   return { text: result };
