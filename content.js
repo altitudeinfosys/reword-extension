@@ -63,31 +63,34 @@ function getSelectedText() {
   return null;
 }
 
+function sanitizeContextValue(str) {
+  if (!str) return null;
+  return str.replace(/[\[\]\n\r{}<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) || null;
+}
+
 function captureContext(element) {
   const ctx = {};
-  ctx.domain = window.location.hostname;
-  ctx.pageTitle = document.title.slice(0, 100);
+  ctx.domain = sanitizeContextValue(window.location.hostname);
+  ctx.pageTitle = sanitizeContextValue(document.title);
 
   if (element) {
-    ctx.fieldTag = element.tagName?.toLowerCase();
-    ctx.fieldType = element.type || null;
-    ctx.fieldName = element.name || element.id || null;
-    ctx.placeholder = element.placeholder || null;
-    ctx.ariaLabel = element.getAttribute('aria-label') || null;
+    ctx.placeholder = sanitizeContextValue(element.placeholder);
+    ctx.ariaLabel = sanitizeContextValue(element.getAttribute('aria-label'));
 
     const id = element.id;
     if (id) {
       const label = document.querySelector(`label[for="${CSS.escape(id)}"]`);
-      if (label) ctx.fieldLabel = label.textContent.trim().slice(0, 100);
+      if (label) ctx.fieldLabel = sanitizeContextValue(label.textContent);
     }
-    if (!ctx.fieldLabel && element.closest('label')) {
-      ctx.fieldLabel = element.closest('label').textContent.trim().slice(0, 100);
+    const closestLabel = element.closest('label');
+    if (!ctx.fieldLabel && closestLabel) {
+      ctx.fieldLabel = sanitizeContextValue(closestLabel.textContent);
     }
 
     const section = element.closest('section, article, form, [role="dialog"], [role="main"]');
     if (section) {
       const heading = section.querySelector('h1, h2, h3, h4, h5, h6');
-      if (heading) ctx.nearbyHeading = heading.textContent.trim().slice(0, 100);
+      if (heading) ctx.nearbyHeading = sanitizeContextValue(heading.textContent);
     }
   }
 
@@ -96,6 +99,9 @@ function captureContext(element) {
 
 function replaceSelectedText(selectionData, newText) {
   if (!selectionData) return;
+
+  // Collapse runs of 3+ newlines into 2 (keeps paragraph breaks, removes excessive spacing)
+  newText = newText.replace(/\n{3,}/g, '\n\n');
 
   if (selectionData.type === 'native') {
     const el = selectionData.element;
@@ -400,7 +406,7 @@ function showUndoPill(snapshot) {
 
   document.body.appendChild(undoPill);
 
-  undoTimer = setTimeout(hideUndoPill, 15000);
+  undoTimer = setTimeout(hideUndoPill, 6000);
 }
 
 function hideUndoPill() {
